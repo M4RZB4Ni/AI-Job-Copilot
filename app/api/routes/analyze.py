@@ -1,8 +1,9 @@
 from fastapi import APIRouter
-from app.models.schemas import JobPostingRequest, JobPostingResponse
+from app.models.schemas import JobPostingRequest, JobPostingAnalysis
+from app.services.llm import analyze_job_posting
 
 router = APIRouter()
 
-@router.post("/analyze", response_model=JobPostingResponse)
-async def analyze_job_posting(request: JobPostingRequest):
-    return JobPostingResponse(text=request.text)
+@router.post("/analyze", response_model=JobPostingAnalysis)
+async def analyze(request: JobPostingRequest):
+    return await analyze_job_posting(request.text)  
