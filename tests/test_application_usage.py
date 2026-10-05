@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI
-from httpx2 import Request as HTTPRequest
+from httpx2 import Request as HTTPRequest, Response as HTTPResponse
 from psycopg import OperationalError
 from psycopg_pool import PoolTimeout
 
@@ -77,6 +77,63 @@ class AnalysisUsageTests(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaises(JobAnalysisError):
             await llm.analyze_job_posting("Engineer posting", usage_logger=self.usage_logger)
+        self.usage_logger.log_usage.assert_not_awaited()
+
+    async def test_api_errors_use_specific_provider_message_and_existing_status(self):
+        cases = [
+            (llm.BadRequestError, 400, 400, "Invalid request sent to Claude API"),
+            (llm.APIStatusError, 500, 502, "Claude API error"),
+        ]
+        for error_type, provider_status, app_status, prefix in cases:
+            with self.subTest(error_type=error_type):
+                self.create.side_effect = error_type(
+                    "SDK fallback message",
+                    response=HTTPResponse(
+                        provider_status,
+                        request=HTTPRequest("POST", "https://example.test/messages"),
+                    ),
+                    body={"error": {"message": "Specific provider message"}},
+                )
+                with self.assertRaises(JobAnalysisError) as caught:
+                    await llm.analyze_job_posting("Engineer posting", usage_logger=self.usage_logger)
+                self.assertEqual(caught.exception.status_code, app_status)
+                self.assertEqual(caught.exception.message, f"{prefix}: Specific provider message")
+        self.usage_logger.log_usage.assert_not_awaited()
+
+    async def test_unexpected_api_error_bodies_fall_back_without_crashing(self):
+        bodies: list[object | None] = [
+            None, "Non-JSON error response", [], {},
+            {"error": None}, {"error": "Unexpected string"}, {"error": []},
+            {"error": {}}, {"error": {"message": None}},
+            {"error": {"message": 123}}, {"error": {"message": []}},
+            {"error": {"message": ""}}, {"error": {"message": "   "}},
+        ]
+        for error_type, provider_status, app_status in (
+            (llm.BadRequestError, 400, 400), (llm.APIStatusError, 500, 502)
+        ):
+            for body in bodies:
+                with self.subTest(error_type=error_type, body=body):
+                    self.create.side_effect = error_type(
+                        "SDK fallback message",
+                        response=HTTPResponse(
+                            provider_status,
+                            request=HTTPRequest("POST", "https://example.test/messages"),
+                        ),
+                        body=body,
+                    )
+                    with self.assertRaises(JobAnalysisError) as caught:
+                        await llm.analyze_job_posting("Engineer posting", usage_logger=self.usage_logger)
+                    self.assertEqual(caught.exception.status_code, app_status)
+                    self.assertTrue(caught.exception.message.endswith(": SDK fallback message"))
+        self.usage_logger.log_usage.assert_not_awaited()
+
+    async def test_timeout_uses_specific_handler_before_connection_handler(self):
+        self.create.side_effect = llm.APITimeoutError(
+            request=HTTPRequest("POST", "https://example.test/messages")
+        )
+        with self.assertRaises(JobAnalysisError) as caught:
+            await llm.analyze_job_posting("Engineer posting", usage_logger=self.usage_logger)
+        self.assertEqual(caught.exception.status_code, 504)
         self.usage_logger.log_usage.assert_not_awaited()
 
 

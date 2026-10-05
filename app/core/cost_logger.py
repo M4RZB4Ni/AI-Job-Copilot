@@ -1,6 +1,6 @@
 """Asynchronous PostgreSQL storage for LLM usage and USD costs."""
 
-from dataclasses import dataclass
+from app.models.usage import UsageTotals
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from types import TracebackType
 import unicodedata
@@ -16,17 +16,6 @@ from app.core.exceptions import ConfigurationError, UsageLogError, UsageValidati
 MAX_TOKENS = 2**63 - 1
 COST_PRECISION = Decimal("0.0000000001")
 MAX_COST = Decimal("9999999999.9999999999")
-
-
-@dataclass(frozen=True)
-class UsageTotals:
-    requests: int
-    input_tokens: int
-    output_tokens: int
-    total_tokens: int
-    # None means at least one request has an unknown price.
-    cost_usd: Decimal | None
-    unpriced_requests: int
 
 
 def _clean_label(value: object, name: str, max_length: int) -> str:

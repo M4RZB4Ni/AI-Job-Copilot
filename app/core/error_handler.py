@@ -7,7 +7,8 @@ from psycopg import Error as DatabaseError
 from psycopg_pool import PoolClosed, PoolTimeout, TooManyRequests
 
 from app.core.exceptions import AppError, UsageLogError
-
+import logging
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def handle_usage_errors(
@@ -20,10 +21,14 @@ async def handle_usage_errors(
     """
     try:
         yield
-    except (DatabaseError, PoolClosed, PoolTimeout, TooManyRequests, UsageLogError):
+    except UsageLogError:
+        if not suppress:
+            raise
+    except (DatabaseError, PoolClosed, PoolTimeout, TooManyRequests) as original:
+        logger.exception("Usage storage failure during: %s", operation)
         error = UsageLogError(f"Unable to {operation}: usage storage is unavailable.")
         if not suppress:
-            raise error from None
+            raise error from original
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)

@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from app.api.routes import analyze
+from app.api.routes import analyze, usage
 from app.config import DATABASE_URL
 from app.core.cost_logger import CostLogger
 from app.core.error_handler import register_exception_handlers
@@ -23,6 +23,7 @@ app = FastAPI(
 
 register_exception_handlers(app)
 app.include_router(analyze.router)
+app.include_router(usage.router)
 
 @app.get("/")
 def hi_root():

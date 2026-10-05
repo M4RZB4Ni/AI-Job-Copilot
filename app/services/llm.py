@@ -1,3 +1,5 @@
+from typing import cast
+
 from anthropic import (
     AsyncAnthropic,
     APIConnectionError,
@@ -5,6 +7,7 @@ from anthropic import (
     AuthenticationError,
     BadRequestError,
     APIStatusError,
+    APITimeoutError,
 )
 from anthropic.types import ToolParam
 from app.config import (
@@ -41,6 +44,20 @@ ANALYSIS_TOOL: ToolParam = {
     },
 }
 
+
+def _get_api_error_detail(error: APIStatusError) -> str:
+    """Read a structured API message, falling back to the SDK's message."""
+    body = error.body
+    if isinstance(body, dict):
+        body_fields = cast(dict[str, object], body)
+        error_fields = body_fields.get("error")
+        if isinstance(error_fields, dict):
+            detail = cast(dict[str, object], error_fields).get("message")
+            if isinstance(detail, str) and detail.strip():
+                return detail
+    return error.message
+
+
 async def analyze_job_posting(
     job_text: str, *, usage_logger: CostLogger
 ) -> JobPostingAnalysis:
@@ -62,14 +79,18 @@ async def analyze_job_posting(
         )
     except AuthenticationError:
         raise JobAnalysisError("Claude API key is invalid or missing.", status_code=500)
+    except APITimeoutError:
+        raise JobAnalysisError("Claude API timed out, try again.", status_code=504)
     except APIConnectionError:
         raise JobAnalysisError("Could not reach the Claude API, check your connection.", status_code=503)
     except RateLimitError:
         raise JobAnalysisError("Rate limit exceeded for Claude API.", status_code=429)
     except BadRequestError as e:
-        raise JobAnalysisError(f"Invalid request sent to Claude API: {e.message}", status_code=400)
+        detail = _get_api_error_detail(e)
+        raise JobAnalysisError(f"Invalid request sent to Claude API: {detail}", status_code=400)
     except APIStatusError as e:
-        raise JobAnalysisError(f"Claude API error: {e.message}", status_code=502)
+        detail = _get_api_error_detail(e)
+        raise JobAnalysisError(f"Claude API error: {detail}", status_code=502)
 
     # The response is billable even if tool parsing/validation later fails.
     await usage_logger.log_usage(
