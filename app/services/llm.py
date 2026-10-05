@@ -6,9 +6,13 @@ from anthropic import (
     BadRequestError,
     APIStatusError,
 )
-from anthropic import AsyncAnthropic
 from anthropic.types import ToolParam
-from app.config import ANTHROPIC_API_KEY
+from app.config import (
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_INPUT_COST_PER_MILLION,
+    ANTHROPIC_OUTPUT_COST_PER_MILLION,
+)
+from app.core.cost_logger import CostLogger, calculate_cost
 from app.models.schemas import JobPostingAnalysis
 from app.core.exceptions import JobAnalysisError
 
@@ -37,7 +41,9 @@ ANALYSIS_TOOL: ToolParam = {
     },
 }
 
-async def analyze_job_posting(job_text: str) -> JobPostingAnalysis:
+async def analyze_job_posting(
+    job_text: str, *, usage_logger: CostLogger
+) -> JobPostingAnalysis:
     if not job_text or not job_text.strip():
         raise JobAnalysisError("Job posting text cannot be empty.", status_code=400)
     
@@ -64,6 +70,20 @@ async def analyze_job_posting(job_text: str) -> JobPostingAnalysis:
         raise JobAnalysisError(f"Invalid request sent to Claude API: {e.message}", status_code=400)
     except APIStatusError as e:
         raise JobAnalysisError(f"Claude API error: {e.message}", status_code=502)
+
+    # The response is billable even if tool parsing/validation later fails.
+    await usage_logger.log_usage(
+        endpoint="/analyze",
+        model=message.model,
+        input_tokens=message.usage.input_tokens,
+        output_tokens=message.usage.output_tokens,
+        cost_usd=calculate_cost(
+            message.usage.input_tokens,
+            message.usage.output_tokens,
+            ANTHROPIC_INPUT_COST_PER_MILLION,
+            ANTHROPIC_OUTPUT_COST_PER_MILLION,
+        ),
+    )
 
     try:
         tool_use_block = next(
