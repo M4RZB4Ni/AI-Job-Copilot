@@ -12,6 +12,9 @@ if not ANTHROPIC_API_KEY:
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
+if not DATABASE_URL:
+    raise ConfigurationError("DATABASE_URL is not set. Add it to your .env file.")
+
 # Standard Claude Sonnet 5 USD rates. Override these for your account/model.
 try:
     ANTHROPIC_INPUT_COST_PER_MILLION = validate_price(
