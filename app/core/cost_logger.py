@@ -65,8 +65,8 @@ def _round_cost(value: Decimal | str | int) -> Decimal:
 def calculate_cost(
     input_tokens: int,
     output_tokens: int,
-    input_price_per_million: Decimal,
-    output_price_per_million: Decimal,
+    input_price_per_million: Decimal | None,
+    output_price_per_million: Decimal | None,
 ) -> Decimal:
     """Calculate standard (uncached) token costs using exact decimal rates."""
     _validate_tokens(input_tokens, "input_tokens")

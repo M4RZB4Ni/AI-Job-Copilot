@@ -26,3 +26,6 @@ class UsageLogError(AppError):
 
     def __init__(self, message: str):
         super().__init__(message, status_code=503)
+
+class LLMProviderError(AppError):
+    """Raised when an LLM vendor call fails. The message is safe to show clients."""

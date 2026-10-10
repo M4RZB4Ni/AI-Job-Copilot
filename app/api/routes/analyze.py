@@ -7,5 +7,7 @@ router = APIRouter()
 @router.post("/analyze", response_model=JobPostingAnalysis)
 async def analyze(request: JobPostingRequest, http_request: Request):
     return await analyze_job_posting(
-        request.text, usage_logger=http_request.app.state.cost_logger
+        request.text,
+        provider=http_request.app.state.llm_provider,
+        usage_logger=http_request.app.state.cost_logger,
     )

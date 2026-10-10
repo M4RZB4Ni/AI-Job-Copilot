@@ -5,12 +5,15 @@ from app.api.routes import analyze, usage
 from app.config import DATABASE_URL
 from app.core.cost_logger import CostLogger
 from app.core.error_handler import register_exception_handlers
+from app.services.providers.factory import build_provider
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    provider = build_provider()
     async with CostLogger(DATABASE_URL) as usage_logger:
         app.state.cost_logger = usage_logger
+        app.state.llm_provider = provider
         yield
 
 
