@@ -1,5 +1,6 @@
 import os
 from decimal import Decimal
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -42,3 +43,13 @@ OPENAI_INPUT_COST_PER_MILLION = _optional_price("OPENAI_INPUT_COST_PER_MILLION")
 OPENAI_OUTPUT_COST_PER_MILLION = _optional_price("OPENAI_OUTPUT_COST_PER_MILLION")
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+def _default_data_dir() -> Path:
+    private = BASE_DIR / "data" / "private"
+    return private if private.is_dir() else BASE_DIR / "data" / "sample"
+
+_data_dir_override = os.environ.get("DATA_DIR")
+DATA_DIR = Path(_data_dir_override) if _data_dir_override else _default_data_dir()
