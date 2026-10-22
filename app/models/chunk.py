@@ -6,3 +6,9 @@ class DocumentChunk(BaseModel):
     chunk_index: int  # position within its section, 0 if the section was not split
     text: str  # section path plus content, this is what gets embedded
     estimated_tokens: int
+    
+class SearchResult(BaseModel):
+    source: str
+    section: str
+    text: str
+    score: float  # cosine similarity: closer to 1 means closer in meaning    

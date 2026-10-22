@@ -1,0 +1,23 @@
+services:
+  db:
+    # image = a packaged, ready-to-run program. This one is PostgreSQL with
+    # pgvector already installed (published by the pgvector project).
+    # If the tag is not found, check the tag list on Docker Hub for pgvector/pgvector.
+    image: pgvector/pgvector:pg17
+    container_name: ai-job-copilot-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_job_copilot}
+    ports:
+      # "host port : container port". We use 5433 on your PC so it does not clash with
+      # the Postgres you installed natively, which uses 5432.
+      # 127.0.0.1 means only your own machine can connect.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      # A volume is a disk the container keeps between restarts.
+      # Without it, the data would vanish when the container is removed.
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
