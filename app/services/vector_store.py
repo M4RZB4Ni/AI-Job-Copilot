@@ -5,7 +5,10 @@ from app.core.exceptions import ConfigurationError
 from app.models.chunk import DocumentChunk, SearchResult
 from app.services.embeddings import EMBEDDING_DIM
 from psycopg import sql
+import logging 
+from app.core.exceptions import ConfigurationError, VectorStoreError
 
+logger = logging.getLogger(__name__)
 
 def _connect() -> psycopg.Connection:
     if not DATABASE_URL:
@@ -62,19 +65,25 @@ def replace_all_chunks(chunks: list[DocumentChunk], vectors: list[list[float]]) 
 
 def search(query_vector: list[float], limit: int = 3) -> list[SearchResult]:
     vector_text = _to_vector_text(query_vector)
-    with _connect() as conn:
-        # <=> is pgvector's COSINE DISTANCE operator (0 = identical, bigger = further).
-        # Similarity = 1 - distance, which equals the score our Python demo printed.
-        # ORDER BY distance ASC puts the closest chunks first, LIMIT keeps the top few.
-        rows = conn.execute(
-            """
-            SELECT source, section, text, 1 - (embedding <=> %s::vector) AS score
-            FROM document_chunks
-            ORDER BY embedding <=> %s::vector
-            LIMIT %s
-            """,
-            (vector_text, vector_text, limit),
-        ).fetchall()
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT source, section, text, 1 - (embedding <=> %s::vector) AS score
+                FROM document_chunks
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (vector_text, vector_text, limit),
+            ).fetchall()
+    except psycopg.Error as error:
+        # The real error (with SQL details) goes to OUR log only. The client gets a
+        # short safe message, the same idea as the usage-logging error handler.
+        # "from error" keeps the original error attached for debugging.
+        logger.exception("Vector search failed")
+        raise VectorStoreError(
+            "Search is unavailable: check that the database is running and documents were ingested."
+        ) from error
     return [
         SearchResult(source=row[0], section=row[1], text=row[2], score=row[3])
         for row in rows

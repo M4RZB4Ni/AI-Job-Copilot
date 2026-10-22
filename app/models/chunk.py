@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class DocumentChunk(BaseModel):
     source: str  # file name, e.g. "cv.md"
@@ -12,3 +13,11 @@ class SearchResult(BaseModel):
     section: str
     text: str
     score: float  # cosine similarity: closer to 1 means closer in meaning    
+    
+    
+class SearchRequest(BaseModel):
+    # Field(...) adds validation rules. If a request breaks them, FastAPI
+    # answers with a 422 error by itself, and our code never runs.
+    query: str = Field(min_length=1, max_length=500)
+    # ge = "greater than or equal", le = "less than or equal": limit must be 1 to 10.
+    limit: int = Field(default=3, ge=1, le=10)    

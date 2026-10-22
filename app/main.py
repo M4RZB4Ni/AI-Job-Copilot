@@ -6,7 +6,13 @@ from app.config import DATABASE_URL
 from app.core.cost_logger import CostLogger
 from app.core.error_handler import register_exception_handlers
 from app.services.providers.factory import build_provider
+from app.api.routes import analyze, search, usage
+import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s [%(name)s] %(message)s",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +33,7 @@ app = FastAPI(
 register_exception_handlers(app)
 app.include_router(analyze.router)
 app.include_router(usage.router)
+app.include_router(search.router)
 
 @app.get("/")
 def hi_root():

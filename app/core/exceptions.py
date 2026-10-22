@@ -29,3 +29,10 @@ class UsageLogError(AppError):
 
 class LLMProviderError(AppError):
     """Raised when an LLM vendor call fails. The message is safe to show clients."""
+    
+    
+class VectorStoreError(AppError):
+    """Raised when the vector database cannot answer a search."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status_code=503)  # 503 = service unavailable    
