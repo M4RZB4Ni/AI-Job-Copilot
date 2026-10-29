@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.models.chunk import SearchRequest, SearchResult
-from app.services import vector_store
+from app.services import vector_service
 from app.services.embeddings import embed_query
 
 router = APIRouter()
@@ -13,4 +13,4 @@ router = APIRouter()
 # An "async def" here would freeze the whole server while the model runs.
 @router.post("/search", response_model=list[SearchResult])
 def search_endpoint(request: SearchRequest) -> list[SearchResult]:
-    return vector_store.search(embed_query(request.query), limit=request.limit)
+    return vector_service.search(embed_query(request.query), limit=request.limit)

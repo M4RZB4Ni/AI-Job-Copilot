@@ -1,7 +1,7 @@
 import sys
 
 from app.services.embeddings import embed_query
-from app.services.vector_store import search
+from app.services.vector_service import search
 
 
 def main() -> None:

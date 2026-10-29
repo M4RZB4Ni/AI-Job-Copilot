@@ -22,6 +22,7 @@ def _to_vector_text(vector: list[float]) -> str:
 
 def init_schema() -> None:
     with _connect() as conn:
+        conn.execute("ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS source_hash TEXT")
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.execute(
             sql.SQL(
@@ -88,3 +89,35 @@ def search(query_vector: list[float], limit: int = 3) -> list[SearchResult]:
         SearchResult(source=row[0], section=row[1], text=row[2], score=row[3])
         for row in rows
     ]
+    
+    
+def get_source_hashes() -> dict[str, str | None]:
+    with _connect() as conn:
+        # DISTINCT returns each (source, hash) pair once, because every chunk of a
+        # file repeats the same values.
+        rows = conn.execute("SELECT DISTINCT source, source_hash FROM document_chunks").fetchall()
+    # Dict comprehension, like the one in chunking: {"cv.md": "ab12...", ...}
+    return {row[0]: row[1] for row in rows}     
+
+
+def replace_source(source: str, source_hash: str, chunks: list[DocumentChunk], vectors: list[list[float]]) -> None:
+    rows = [
+        (chunk.source, chunk.section, chunk.chunk_index, chunk.text, _to_vector_text(vector), source_hash)
+        for chunk, vector in zip(chunks, vectors)
+    ]
+    with _connect() as conn:
+        # Same transaction as before: the old rows of THIS file are swapped for the
+        # new ones, and the other files are not touched.
+        conn.execute("DELETE FROM document_chunks WHERE source = %s", (source,))
+        with conn.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO document_chunks (source, section, chunk_index, text, embedding, source_hash)
+                VALUES (%s, %s, %s, %s, %s::vector, %s)
+                """,
+                rows,
+            )
+            
+def delete_source(source: str) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM document_chunks WHERE source = %s", (source,))            

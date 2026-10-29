@@ -1,7 +1,7 @@
 from app.config import DATA_DIR
 from app.services.chunking import chunk_directory
 from app.services.embeddings import embed_documents
-from app.services.vector_store import init_schema, replace_all_chunks
+from app.services.vector_service import init_schema, replace_all_chunks
 
 
 def main() -> None:
